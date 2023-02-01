@@ -123,7 +123,7 @@ public class ImageSelectActivity extends HelperActivity {
                     }
 
                     case Constants.FETCH_COMPLETED: {
-                        /*
+                        /*X
                         If adapter is null, this implies that the loaded images will be shown
                         for the first time, hence send FETCH_COMPLETED message.
                         However, if adapter has been initialised, this thread was run either

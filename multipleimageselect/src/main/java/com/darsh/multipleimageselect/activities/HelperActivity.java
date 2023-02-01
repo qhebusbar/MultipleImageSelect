@@ -6,26 +6,25 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
+import android.view.View;
 
 import androidx.annotation.NonNull;
-
-import com.google.android.material.snackbar.Snackbar;
-
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.appcompat.app.AppCompatActivity;
-
-import android.view.View;
 
 import com.darsh.multipleimageselect.R;
 import com.darsh.multipleimageselect.helpers.Constants;
+import com.google.android.material.snackbar.Snackbar;
 
 /**
  * Created by darshan on 26/9/16.
  */
 public class HelperActivity extends AppCompatActivity {
-    protected View view;
 
+    // Manifest.permission.WRITE_EXTERNAL_STORAGE is deprecated since sdkVersion >= 33
+
+    protected View view;
     private final int maxLines = 4;
 
     private String[] getPermissions() {
@@ -35,30 +34,33 @@ public class HelperActivity extends AppCompatActivity {
     }
 
     protected void checkPermission() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED &&
-                ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED) {
+        if (checkPermissions()) {
             permissionGranted();
         } else {
             ActivityCompat.requestPermissions(this, getPermissions(), Constants.PERMISSION_REQUEST_CODE);
         }
     }
 
-    private void requestOldPermission() {
-        if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-            showRequestPermissionRationale();
+    private boolean checkPermissions() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ?
+                ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED :
+                ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED &&
+                        ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED;
+    }
 
+    private void requestPermission() {
+        if (shouldShowRequestPermissionsRationale()) {
+            showRequestPermissionRationale();
         } else {
             showAppPermissionSettings();
         }
     }
 
-    private void requestPermission() {
-        if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.READ_MEDIA_IMAGES) ||
-                ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.READ_MEDIA_VIDEO)) {
-            showRequestPermissionRationale();
-        } else {
-            showAppPermissionSettings();
-        }
+    private boolean shouldShowRequestPermissionsRationale() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ?
+                ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) :
+                ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.READ_MEDIA_IMAGES) ||
+                        ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.READ_MEDIA_VIDEO);
     }
 
     private void showRequestPermissionRationale() {
@@ -125,11 +127,7 @@ public class HelperActivity extends AppCompatActivity {
 
     private void permissionDenied() {
         hideViews();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requestPermission();
-        } else {
-            requestOldPermission();
-        }
+        requestPermission();
     }
 
     protected void hideViews() {
