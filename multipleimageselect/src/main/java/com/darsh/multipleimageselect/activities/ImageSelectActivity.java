@@ -13,6 +13,7 @@ import android.provider.MediaStore;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.widget.Toolbar;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.ActionMode;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -331,64 +332,69 @@ public class ImageSelectActivity extends HelperActivity {
                 sendMessage(Constants.FETCH_STARTED);
             }
 
-            File file;
-            HashSet<Long> selectedImages = new HashSet<>();
-            if (images != null) {
-                Image image;
-                for (int i = 0, l = images.size(); i < l; i++) {
-                    image = images.get(i);
-                    file = new File(image.path);
-                    if (file.exists() && image.isSelected) {
-                        selectedImages.add(image.id);
+            try {
+
+                File file;
+                HashSet<Long> selectedImages = new HashSet<>();
+                if (images != null) {
+                    Image image;
+                    for (int i = 0, l = images.size(); i < l; i++) {
+                        image = images.get(i);
+                        file = new File(image.path);
+                        if (file.exists() && image.isSelected) {
+                            selectedImages.add(image.id);
+                        }
                     }
                 }
+
+                Cursor cursor = getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection,
+                        MediaStore.Images.Media.BUCKET_DISPLAY_NAME + " =?", new String[]{album}, MediaStore.Images.Media.DATE_ADDED);
+                if (cursor == null) {
+                    sendMessage(Constants.ERROR);
+                    return;
+                }
+
+                /*
+                In case this runnable is executed to onChange calling loadImages,
+                using countSelected variable can result in a race condition. To avoid that,
+                tempCountSelected keeps track of number of selected images. On handling
+                FETCH_COMPLETED message, countSelected is assigned value of tempCountSelected.
+                 */
+                int tempCountSelected = 0;
+                ArrayList<Image> temp = new ArrayList<>(cursor.getCount());
+                if (cursor.moveToLast()) {
+                    do {
+                        if (Thread.interrupted()) {
+                            return;
+                        }
+
+                        long id = cursor.getLong(cursor.getColumnIndex(projection[0]));
+                        String name = cursor.getString(cursor.getColumnIndex(projection[1]));
+                        String path = cursor.getString(cursor.getColumnIndex(projection[2]));
+                        boolean isSelected = selectedImages.contains(id);
+                        if (isSelected) {
+                            tempCountSelected++;
+                        }
+
+                        file = new File(path);
+                        if (file.exists()) {
+                            temp.add(new Image(id, name, path, isSelected));
+                        }
+
+                    } while (cursor.moveToPrevious());
+                }
+                cursor.close();
+
+                if (images == null) {
+                    images = new ArrayList<>();
+                }
+                images.clear();
+                images.addAll(temp);
+
+                sendMessage(Constants.FETCH_COMPLETED, tempCountSelected);
+            } catch (Exception e) {
+                Log.e("ImageSelectActivity", e.getMessage());
             }
-
-            Cursor cursor = getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection,
-                    MediaStore.Images.Media.BUCKET_DISPLAY_NAME + " =?", new String[]{ album }, MediaStore.Images.Media.DATE_ADDED);
-            if (cursor == null) {
-                sendMessage(Constants.ERROR);
-                return;
-            }
-
-            /*
-            In case this runnable is executed to onChange calling loadImages,
-            using countSelected variable can result in a race condition. To avoid that,
-            tempCountSelected keeps track of number of selected images. On handling
-            FETCH_COMPLETED message, countSelected is assigned value of tempCountSelected.
-             */
-            int tempCountSelected = 0;
-            ArrayList<Image> temp = new ArrayList<>(cursor.getCount());
-            if (cursor.moveToLast()) {
-                do {
-                    if (Thread.interrupted()) {
-                        return;
-                    }
-
-                    long id = cursor.getLong(cursor.getColumnIndex(projection[0]));
-                    String name = cursor.getString(cursor.getColumnIndex(projection[1]));
-                    String path = cursor.getString(cursor.getColumnIndex(projection[2]));
-                    boolean isSelected = selectedImages.contains(id);
-                    if (isSelected) {
-                        tempCountSelected++;
-                    }
-
-                    file = new File(path);
-                    if (file.exists()) {
-                        temp.add(new Image(id, name, path, isSelected));
-                    }
-
-                } while (cursor.moveToPrevious());
-            }
-            cursor.close();
-
-            if (images == null) {
-                images = new ArrayList<>();
-            }
-            images.clear();
-            images.addAll(temp);
-
-            sendMessage(Constants.FETCH_COMPLETED, tempCountSelected);
         }
     }
 
